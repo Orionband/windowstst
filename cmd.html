@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Windows Command Prompt Simulator</title>
+    <title>Windows CMD</title>
     <style>
         body {
             margin: 0;
@@ -22,8 +22,12 @@
             white-space: pre-wrap;
             font-size: 14px;
             line-height: 1.2;
-            display: flex;
-            flex-direction: column;
+        }
+        
+        .version-info {
+            margin-bottom: 10px;
+            padding: 0;
+            white-space: pre-wrap;
         }
         
         .input-line {
@@ -53,7 +57,6 @@
         .output {
             margin: 0;
             padding: 0;
-            flex-grow: 1;
         }
         
         .cursor {
@@ -125,11 +128,12 @@
 </head>
 <body>
     <div class="terminal" id="terminal">
-        <div class="output" id="output"></div>
+        <div class="version-info" id="versionInfo"></div>
         <div class="input-line" id="inputLine">
             <span class="prompt" id="prompt">C:\Users\guest></span>
             <input type="text" class="input" id="input" autocomplete="off" spellcheck="false">
         </div>
+        <div class="output" id="output"></div>
     </div>
 
     <div class="result-screen" id="resultScreen" style="display: none;">
@@ -144,10 +148,10 @@
         class CMDSimulator {
             constructor() {
                 this.currentPath = "C:\\Users\\guest";
-                this.directories = new Set(['C:\\Users\\guest']);
                 this.versionOrig = "Microsoft Windows [Version 10.0.22000.1098]";
                 this.version = this.versionOrig + "\n(c) Microsoft Corporation. All rights reserved.\n";
-                this.expectedCommand = this.getExpectedCommand();
+                // MODIFIED: Get an array of accepted answers from the URL
+                this.acceptedAnswers = this.getAcceptedAnswers();
                 this.quizCompleted = false;
                 
                 this.terminal = document.getElementById('terminal');
@@ -155,6 +159,7 @@
                 this.input = document.getElementById('input');
                 this.prompt = document.getElementById('prompt');
                 this.inputLine = document.getElementById('inputLine');
+                this.versionInfo = document.getElementById('versionInfo');
                 this.resultScreen = document.getElementById('resultScreen');
                 this.resultTitle = document.getElementById('resultTitle');
                 this.resultMessage = document.getElementById('resultMessage');
@@ -162,14 +167,23 @@
                 this.init();
             }
             
-            getExpectedCommand() {
+            // NEW METHOD: Parses the 'q' parameter for multiple, comma-separated answers.
+            getAcceptedAnswers() {
                 const urlParams = new URLSearchParams(window.location.search);
-                return urlParams.get('q') || '';
+                const qParam = urlParams.get('q');
+
+                // If q parameter is not present, no answer is correct.
+                if (qParam === null) {
+                    return [];
+                }
+
+                // If q is present, split it by commas, trim whitespace from each part,
+                // and convert to lower case. This creates an array of valid answers.
+                return qParam.split(',').map(answer => answer.trim().toLowerCase());
             }
             
             init() {
-                this.printOutput(this.version);
-                this.updatePrompt();
+                this.versionInfo.textContent = this.version;
                 this.input.focus();
                 
                 this.input.addEventListener('keydown', (e) => {
@@ -204,39 +218,50 @@
                 this.prompt.textContent = this.currentPath + ">";
             }
             
+            // MODIFIED: Checks if the user input is in the array of accepted answers.
             processCommand() {
-                const cmdRaw = this.input.value;
+                const userInput = this.input.value.trim().toLowerCase();
                 
-                // Display the command
-                this.printOutput(this.currentPath + ">" + cmdRaw);
-                
-                // Clear input
-                this.input.value = '';
-                
-                // Check if command matches expected command
-                if (cmdRaw.trim().toLowerCase() === this.expectedCommand.toLowerCase()) {
+                // Check if the user's input is one of the accepted answers.
+                // The check is case-insensitive because both the user input and the
+                // accepted answers array were converted to lower case.
+                if (this.acceptedAnswers.includes(userInput)) {
                     this.showResult(true);
                 } else {
                     this.showResult(false);
                 }
                 
                 this.quizCompleted = true;
-                this.updatePrompt();
             }
             
             showResult(isCorrect) {
                 const resultContent = this.resultScreen.querySelector('.result-content');
-                
+    
                 if (isCorrect) {
                     resultContent.className = 'result-content correct';
                     this.resultTitle.textContent = 'Correct!';
-                    this.resultMessage.textContent = `Great job! You entered the correct command: "${this.expectedCommand}"`;
+                    this.resultMessage.textContent = 'Great job! You entered the correct command.';
                 } else {
+                    const messages = [
+                        "Remember, it's nats or your kneecaps!",
+                        "This is not skibidi sigma behavior.",
+                        "HAIYAAAA even my 5 year old cousin can do better la!",
+                        "You have brought dishonor to your ancestors.",
+                        "Lock in.",
+                        "Are we dead ahh right now?",
+                        "Don't worry. There's always McDonalds.",
+                        "Stop gooning and lock in.",
+                        "Cut the doom scrolling and actually do something useful.",
+                        "Skill issue. Do better.",
+                        "If you don't get this right, you're beyond cooked."
+                    ];
+                    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+            
                     resultContent.className = 'result-content wrong';
                     this.resultTitle.textContent = 'Wrong!';
-                    this.resultMessage.textContent = `The correct command was: "${this.expectedCommand}"\nYou entered: "${this.input.value || 'nothing'}"`;
+                    this.resultMessage.textContent = randomMessage;
                 }
-                
+    
                 this.resultScreen.style.display = 'flex';
                 this.inputLine.style.display = 'none';
             }
@@ -269,6 +294,7 @@
                 }
             }
             
+           
         }
         
         // Reset function
@@ -276,6 +302,9 @@
             document.getElementById('resultScreen').style.display = 'none';
             document.getElementById('inputLine').style.display = 'flex';
             document.getElementById('output').innerHTML = '';
+            
+            // Clear the input field
+            document.getElementById('input').value = '';
             
             // Reinitialize the simulator
             new CMDSimulator();
