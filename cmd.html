@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows Command Prompt Simulator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        .terminal {
+            height: 100vh;
+            background-color: #000;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.2;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .prompt {
+            color: #fff;
+            margin-right: 0;
+        }
+        
+        .input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            outline: none;
+            flex: 1;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .output {
+            margin: 0;
+            padding: 0;
+            flex-grow: 1;
+        }
+        
+        .cursor {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .result-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .result-content {
+            background-color: #000;
+            border: 2px solid #fff;
+            padding: 40px;
+            text-align: center;
+            border-radius: 10px;
+            max-width: 400px;
+        }
+        
+        .result-content h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+        }
+        
+        .result-content.correct h2 {
+            color: #00ff00;
+        }
+        
+        .result-content.wrong h2 {
+            color: #ff0000;
+        }
+        
+        .result-content p {
+            margin: 0 0 30px 0;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        
+        .reset-btn {
+            background-color: #333;
+            color: #fff;
+            border: 2px solid #fff;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .reset-btn:hover {
+            background-color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal" id="terminal">
+        <div class="output" id="output"></div>
+        <div class="input-line" id="inputLine">
+            <span class="prompt" id="prompt">C:\Users\guest></span>
+            <input type="text" class="input" id="input" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+
+    <div class="result-screen" id="resultScreen" style="display: none;">
+        <div class="result-content">
+            <h2 id="resultTitle"></h2>
+            <p id="resultMessage"></p>
+            <button class="reset-btn" onclick="resetQuiz()">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        class CMDSimulator {
+            constructor() {
+                this.currentPath = "C:\\Users\\guest";
+                this.directories = new Set(['C:\\Users\\guest']);
+                this.versionOrig = "Microsoft Windows [Version 10.0.22000.1098]";
+                this.version = this.versionOrig + "\n(c) Microsoft Corporation. All rights reserved.\n";
+                this.expectedCommand = this.getExpectedCommand();
+                this.quizCompleted = false;
+                
+                this.terminal = document.getElementById('terminal');
+                this.output = document.getElementById('output');
+                this.input = document.getElementById('input');
+                this.prompt = document.getElementById('prompt');
+                this.inputLine = document.getElementById('inputLine');
+                this.resultScreen = document.getElementById('resultScreen');
+                this.resultTitle = document.getElementById('resultTitle');
+                this.resultMessage = document.getElementById('resultMessage');
+                
+                this.init();
+            }
+            
+            getExpectedCommand() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('q') || '';
+            }
+            
+            init() {
+                this.printOutput(this.version);
+                this.updatePrompt();
+                this.input.focus();
+                
+                this.input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !this.quizCompleted) {
+                        this.processCommand();
+                    }
+                });
+                
+                // Keep input focused
+                document.addEventListener('click', () => {
+                    if (!this.quizCompleted) {
+                        this.input.focus();
+                    }
+                });
+            }
+            
+            printOutput(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                div.style.margin = '0';
+                div.style.padding = '0';
+                div.style.lineHeight = '1.2';
+                this.output.appendChild(div);
+                this.scrollToBottom();
+            }
+            
+            scrollToBottom() {
+                this.terminal.scrollTop = this.terminal.scrollHeight;
+            }
+            
+            updatePrompt() {
+                this.prompt.textContent = this.currentPath + ">";
+            }
+            
+            processCommand() {
+                const cmdRaw = this.input.value;
+                
+                // Display the command
+                this.printOutput(this.currentPath + ">" + cmdRaw);
+                
+                // Clear input
+                this.input.value = '';
+                
+                // Check if command matches expected command
+                if (cmdRaw.trim().toLowerCase() === this.expectedCommand.toLowerCase()) {
+                    this.showResult(true);
+                } else {
+                    this.showResult(false);
+                }
+                
+                this.quizCompleted = true;
+                this.updatePrompt();
+            }
+            
+            showResult(isCorrect) {
+                const resultContent = this.resultScreen.querySelector('.result-content');
+                
+                if (isCorrect) {
+                    resultContent.className = 'result-content correct';
+                    this.resultTitle.textContent = 'Correct!';
+                    this.resultMessage.textContent = `Great job! You entered the correct command: "${this.expectedCommand}"`;
+                } else {
+                    resultContent.className = 'result-content wrong';
+                    this.resultTitle.textContent = 'Wrong!';
+                    this.resultMessage.textContent = `The correct command was: "${this.expectedCommand}"\nYou entered: "${this.input.value || 'nothing'}"`;
+                }
+                
+                this.resultScreen.style.display = 'flex';
+                this.inputLine.style.display = 'none';
+            }
+            
+            changeDirectory(cmdRaw) {
+                try {
+                    if (cmdRaw.includes("cd ..") || cmdRaw === "cd..") {
+                        // Go up one directory
+                        const pathParts = this.currentPath.split("\\");
+                        if (pathParts.length > 1) {
+                            pathParts.pop();
+                            this.currentPath = pathParts.join("\\");
+                            if (this.currentPath === "C:") {
+                                this.currentPath = "C:\\";
+                            }
+                        }
+                    } else {
+                        // Change to specified directory
+                        const targetDir = cmdRaw.split("cd ")[1];
+                        if (targetDir) {
+                            if (targetDir.includes("\\")) {
+                                this.currentPath = targetDir;
+                            } else {
+                                this.currentPath = this.currentPath + "\\" + targetDir;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Handle any errors silently like the original
+                }
+            }
+            
+        }
+        
+        // Reset function
+        function resetQuiz() {
+            document.getElementById('resultScreen').style.display = 'none';
+            document.getElementById('inputLine').style.display = 'flex';
+            document.getElementById('output').innerHTML = '';
+            
+            // Reinitialize the simulator
+            new CMDSimulator();
+        }
+        
+        // Initialize the simulator when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new CMDSimulator();
+        });
+    </script>
+</body>
+</html>
