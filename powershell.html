@@ -36,6 +36,7 @@
             align-items: center;
             margin: 0;
             padding: 0;
+            line-height: 1.2;
         }
         
         .prompt {
@@ -235,13 +236,15 @@
                 // Create a new input line
                 const newInputLine = document.createElement('div');
                 newInputLine.className = 'input-line';
+                newInputLine.style.margin = '0';
+                newInputLine.style.padding = '0';
                 newInputLine.innerHTML = `
                     <span class="prompt">PS ${this.currentPath}></span>
                     <input type="text" class="input" autocomplete="off" spellcheck="false">
                 `;
                 
-                // Add it after the output
-                this.output.appendChild(newInputLine);
+                // Add it after the terminal div, not inside the output div
+                this.terminal.appendChild(newInputLine);
                 
                 // Update references to the new input elements
                 this.inputLine = newInputLine;
