@@ -61,6 +61,12 @@
             padding: 0;
         }
         
+        .output > div {
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+        
         .cursor {
             animation: blink 1s infinite;
         }
@@ -218,7 +224,7 @@
             addCommandToHistory(command) {
                 // Add the command with prompt to output
                 const div = document.createElement('div');
-                div.innerHTML = `<span style="color: #fff;">${this.prompt.textContent}</span>${command}`;
+                div.innerHTML = `<span style="color: #fff;">PS ${this.currentPath}></span>${command}`;
                 div.style.margin = '0';
                 div.style.padding = '0';
                 div.style.lineHeight = '1.2';
