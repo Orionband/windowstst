@@ -224,42 +224,6 @@
                 div.style.lineHeight = '1.2';
                 this.output.appendChild(div);
                 this.scrollToBottom();
-                
-                // Create a new input line for the next command
-                this.createNewInputLine();
-            }
-            
-            createNewInputLine() {
-                // Hide the current input line
-                this.inputLine.style.display = 'none';
-                
-                // Create a new input line
-                const newInputLine = document.createElement('div');
-                newInputLine.className = 'input-line';
-                newInputLine.style.margin = '0';
-                newInputLine.style.padding = '0';
-                newInputLine.innerHTML = `
-                    <span class="prompt">PS ${this.currentPath}></span>
-                    <input type="text" class="input" autocomplete="off" spellcheck="false">
-                `;
-                
-                // Add it after the terminal div, not inside the output div
-                this.terminal.appendChild(newInputLine);
-                
-                // Update references to the new input elements
-                this.inputLine = newInputLine;
-                this.input = newInputLine.querySelector('.input');
-                this.prompt = newInputLine.querySelector('.prompt');
-                
-                // Focus the new input
-                this.input.focus();
-                
-                // Re-attach event listeners
-                this.input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !this.quizCompleted) {
-                        this.processCommand();
-                    }
-                });
             }
             
             printOutput(text) {
@@ -314,7 +278,7 @@
                             }
                             if (stillMatching) {
                                 // Still building the sequence, don't end quiz yet
-                                // But don't create a new input line, we already did that in addCommandToHistory
+                                // Just clear the input and continue
                                 return;
                             }
                         }
