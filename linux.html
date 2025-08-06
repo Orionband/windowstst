@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux Terminal</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Ubuntu Mono', 'Courier New', monospace;
+            background-color: #300a24;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        div {
+            margin: 0;
+            padding: 0;
+        }
+        
+        .terminal {
+            height: 100vh;
+            background-color: #300a24;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.2;
+        }
+        
+        .version-info {
+            margin-bottom: 0;
+            padding: 0;
+            white-space: pre-wrap;
+            color: #fff;
+        }
+        
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+        
+        .prompt {
+            color: #8ae234;
+            margin-right: 0;
+        }
+        
+        .input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: 'Ubuntu Mono', 'Courier New', monospace;
+            font-size: 14px;
+            outline: none;
+            flex: 1;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .command-area {
+            margin: 0;
+            padding: 0;
+        }
+        
+        .cursor {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .result-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .result-content {
+            background-color: #300a24;
+            border: 2px solid #8ae234;
+            padding: 40px;
+            text-align: center;
+            border-radius: 10px;
+            max-width: 400px;
+        }
+        
+        .result-content h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+        }
+        
+        .result-content.correct h2 {
+            color: #00ff00;
+        }
+        
+        .result-content.wrong h2 {
+            color: #ff0000;
+        }
+        
+        .result-content p {
+            margin: 0 0 30px 0;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        
+        .reset-btn {
+            background-color: #4e9a06;
+            color: #fff;
+            border: 2px solid #8ae234;
+            padding: 10px 20px;
+            font-family: 'Ubuntu Mono', 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .reset-btn:hover {
+            background-color: #73d216;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal" id="terminal">
+        <div class="version-info" id="versionInfo"></div>
+        <div class="command-area" id="commandArea">
+            <div class="input-line" id="inputLine">
+                <span class="prompt" id="prompt">user@linux:~$</span>
+                <input type="text" class="input" id="input" autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+    </div>
+
+    <div class="result-screen" id="resultScreen" style="display: none;">
+        <div class="result-content">
+            <h2 id="resultTitle"></h2>
+            <p id="resultMessage"></p>
+            <button class="reset-btn" onclick="resetQuiz()">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        class LinuxTerminalSimulator {
+            constructor() {
+                this.username = "user";
+                this.hostname = "linux";
+                this.currentPath = "~";
+                this.isRoot = false;
+                this.version = "Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-88-generic x86_64)\n\n * Documentation:  https://help.ubuntu.com\n * Management:     https://landscape.canonical.com\n * Support:        https://ubuntu.com/advantage\n\nLast login: " + new Date().toDateString() + " " + new Date().toTimeString().split(' ')[0] + " from 192.168.1.100\n";
+                // Get an array of accepted answers from the URL
+                this.acceptedAnswers = this.getAcceptedAnswers();
+                this.quizCompleted = false;
+                this.enteredCommands = [];
+                this.currentSequence = [];
+                
+                this.terminal = document.getElementById('terminal');
+                this.commandArea = document.getElementById('commandArea');
+                this.input = document.getElementById('input');
+                this.prompt = document.getElementById('prompt');
+                this.inputLine = document.getElementById('inputLine');
+                this.versionInfo = document.getElementById('versionInfo');
+                this.resultScreen = document.getElementById('resultScreen');
+                this.resultTitle = document.getElementById('resultTitle');
+                this.resultMessage = document.getElementById('resultMessage');
+                
+                this.init();
+            }
+            
+            // Parses the 'q' parameter for multiple, comma-separated answers.
+            // Now also handles multi-line sequences indicated by colons
+            getAcceptedAnswers() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const qParam = urlParams.get('q');
+
+                // If q parameter is not present, no answer is correct.
+                if (qParam === null) {
+                    return [];
+                }
+
+                // Split by commas to get individual answer options
+                const answerOptions = qParam.split(',').map(answer => answer.trim());
+                
+                // Process each answer option
+                return answerOptions.map(answer => {
+                    // Check if this answer contains colons (multi-line sequence)
+                    if (answer.includes(':')) {
+                        // Split by colon and convert each line to lowercase
+                        return answer.split(':').map(line => line.trim().toLowerCase());
+                    } else {
+                        // Single line answer
+                        return answer.toLowerCase();
+                    }
+                });
+            }
+            
+            init() {
+                this.versionInfo.textContent = this.version;
+                this.input.focus();
+                
+                this.input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !this.quizCompleted) {
+                        this.processCommand();
+                    }
+                });
+                
+                // Keep input focused
+                document.addEventListener('click', () => {
+                    if (!this.quizCompleted) {
+                        this.input.focus();
+                    }
+                });
+            }
+            
+            addCommandToHistory(command) {
+                // Convert current input line to history
+                const historyLine = document.createElement('div');
+                historyLine.className = 'input-line';
+                historyLine.innerHTML = `<span class="prompt" style="color: #8ae234;">${this.prompt.textContent}</span> ${command}`;
+                
+                // Insert before the current input line
+                this.commandArea.insertBefore(historyLine, this.inputLine);
+                
+                this.scrollToBottom();
+            }
+            
+            printOutput(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                div.style.margin = '0';
+                div.style.padding = '0';
+                div.style.lineHeight = '1.2';
+                this.output.appendChild(div);
+                this.scrollToBottom();
+            }
+            
+            scrollToBottom() {
+                this.terminal.scrollTop = this.terminal.scrollHeight;
+            }
+            
+            updatePrompt() {
+                const symbol = this.isRoot ? "#" : "$";
+                const promptText = `${this.username}@${this.hostname}:${this.currentPath}${symbol}`;
+                this.prompt.textContent = promptText;
+            }
+            
+            // Checks if the user input matches any of the accepted answer patterns
+            processCommand() {
+                const userInput = this.input.value.trim();
+                
+                // Add the command to the display history
+                this.addCommandToHistory(userInput);
+                
+                // Add to our sequence tracking
+                this.currentSequence.push(userInput.toLowerCase());
+                
+                // Handle directory changes and privilege escalation
+                this.handleDirectoryChange(userInput);
+                
+                // Clear the input field for the next command
+                this.input.value = '';
+                
+                // Check if we have a match with any of the accepted answers
+                let isCorrect = false;
+                
+                for (let answer of this.acceptedAnswers) {
+                    if (Array.isArray(answer)) {
+                        // Multi-line answer - check if current sequence matches
+                        if (this.arraysEqual(this.currentSequence, answer)) {
+                            isCorrect = true;
+                            break;
+                        }
+                        // Check if we're still building towards this answer
+                        if (answer.length > this.currentSequence.length) {
+                            let stillMatching = true;
+                            for (let i = 0; i < this.currentSequence.length; i++) {
+                                if (this.currentSequence[i] !== answer[i]) {
+                                    stillMatching = false;
+                                    break;
+                                }
+                            }
+                            if (stillMatching) {
+                                // Still building the sequence, don't end quiz yet
+                                // Just clear the input and continue
+                                return;
+                            }
+                        }
+                    } else {
+                        // Single line answer
+                        if (this.currentSequence.length === 1 && this.currentSequence[0] === answer) {
+                            isCorrect = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Show result
+                this.showResult(isCorrect);
+                this.quizCompleted = true;
+            }
+            
+            // Helper function to compare arrays
+            arraysEqual(a, b) {
+                if (a.length !== b.length) return false;
+                for (let i = 0; i < a.length; i++) {
+                    if (a[i] !== b[i]) return false;
+                }
+                return true;
+            }
+            
+            showResult(isCorrect) {
+                const resultContent = this.resultScreen.querySelector('.result-content');
+    
+                if (isCorrect) {
+                    resultContent.className = 'result-content correct';
+                    this.resultTitle.textContent = 'Correct!';
+                    this.resultMessage.textContent = 'Great job! You entered the correct Linux command.';
+                } else {
+                    const messages = [
+                        "Remember, it's nats or your kneecaps!",
+                        "This is not skibidi sigma behavior.",
+                        "HAIYAAAA even my 5 year old cousin can do better la!",
+                        "You have brought dishonor to your ancestors.",
+                        "Lock in.",
+                        "Are we dead ahh right now?",
+                        "Don't worry. There's always McDonalds.",
+                        "Stop gooning and lock in.",
+                        "Cut the doom scrolling and actually do something useful.",
+                        "Skill issue. Do better.",
+                        "If you don't get this right, you're beyond cooked.",
+                        "Command not found. Try using your brain.",
+                        "Permission denied. You lack the skills.",
+                        "bash: skill_issue: command not found",
+                        "sudo won't help you with this one.",
+                        "Even a script kiddie could do better.",
+                        "404: Brain not found."
+                    ];
+                    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+            
+                    resultContent.className = 'result-content wrong';
+                    this.resultTitle.textContent = 'Wrong!';
+                    this.resultMessage.textContent = randomMessage;
+                }
+    
+                this.resultScreen.style.display = 'flex';
+                this.inputLine.style.display = 'none';
+            }
+            
+            handleDirectoryChange(command) {
+                const cmd = command.toLowerCase().trim();
+                
+                if (cmd.startsWith("cd ")) {
+                    const targetDir = command.substring(3).trim();
+                    if (targetDir === "..") {
+                        // Go up one directory
+                        if (this.currentPath !== "~" && this.currentPath !== "/") {
+                            const pathParts = this.currentPath.split("/");
+                            pathParts.pop();
+                            this.currentPath = pathParts.join("/") || "/";
+                        }
+                    } else if (targetDir === "~" || targetDir === "") {
+                        this.currentPath = "~";
+                    } else if (targetDir.startsWith("/")) {
+                        this.currentPath = targetDir;
+                    } else {
+                        if (this.currentPath === "~") {
+                            this.currentPath = "~/" + targetDir;
+                        } else if (this.currentPath === "/") {
+                            this.currentPath = "/" + targetDir;
+                        } else {
+                            this.currentPath = this.currentPath + "/" + targetDir;
+                        }
+                    }
+                    this.updatePrompt();
+                } else if (cmd === "sudo su" || cmd === "sudo su -") {
+                    this.username = "root";
+                    this.isRoot = true;
+                    this.currentPath = "/root";
+                    this.updatePrompt();
+                } else if (cmd === "exit" && this.isRoot) {
+                    this.username = "user";
+                    this.isRoot = false;
+                    this.currentPath = "~";
+                    this.updatePrompt();
+                }
+            }
+        }
+        
+        // Reset function
+        function resetQuiz() {
+            document.getElementById('resultScreen').style.display = 'none';
+            document.getElementById('inputLine').style.display = 'flex';
+            
+            // Clear command area except for the input line
+            const commandArea = document.getElementById('commandArea');
+            const inputLine = document.getElementById('inputLine');
+            commandArea.innerHTML = '';
+            commandArea.appendChild(inputLine);
+            
+            // Clear the input field
+            document.getElementById('input').value = '';
+            
+            // Reinitialize the simulator
+            window.linuxSim = new LinuxTerminalSimulator();
+        }
+        
+        // Initialize the simulator when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.linuxSim = new LinuxTerminalSimulator();
+        });
+    </script>
+</body>
+</html>
