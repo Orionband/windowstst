@@ -65,15 +65,9 @@
             margin: 0;
         }
         
-        .output {
+        .command-area {
             margin: 0;
             padding: 0;
-        }
-        
-        .output > div {
-            margin: 0;
-            padding: 0;
-            line-height: 1.2;
         }
         
         .cursor {
@@ -146,10 +140,11 @@
 <body>
     <div class="terminal" id="terminal">
         <div class="version-info" id="versionInfo"></div>
-        <div class="output" id="output"></div>
-        <div class="input-line" id="inputLine">
-            <span class="prompt" id="prompt">PS C:\Users\guest></span>
-            <input type="text" class="input" id="input" autocomplete="off" spellcheck="false">
+        <div class="command-area" id="commandArea">
+            <div class="input-line" id="inputLine">
+                <span class="prompt" id="prompt">PS C:\Users\guest></span>
+                <input type="text" class="input" id="input" autocomplete="off" spellcheck="false">
+            </div>
         </div>
     </div>
 
@@ -173,7 +168,7 @@
                 this.currentSequence = [];
                 
                 this.terminal = document.getElementById('terminal');
-                this.output = document.getElementById('output');
+                this.commandArea = document.getElementById('commandArea');
                 this.input = document.getElementById('input');
                 this.prompt = document.getElementById('prompt');
                 this.inputLine = document.getElementById('inputLine');
@@ -231,13 +226,14 @@
             }
             
             addCommandToHistory(command) {
-                // Add the command with prompt to output
-                const div = document.createElement('div');
-                div.innerHTML = `<span style="color: #fff;">PS ${this.currentPath}></span>${command}`;
-                div.style.margin = '0';
-                div.style.padding = '0';
-                div.style.lineHeight = '1.2';
-                this.output.appendChild(div);
+                // Convert current input line to history
+                const historyLine = document.createElement('div');
+                historyLine.className = 'input-line';
+                historyLine.innerHTML = `<span class="prompt">PS ${this.currentPath}></span>${command}`;
+                
+                // Insert before the current input line
+                this.commandArea.insertBefore(historyLine, this.inputLine);
+                
                 this.scrollToBottom();
             }
             
@@ -388,7 +384,12 @@
         function resetQuiz() {
             document.getElementById('resultScreen').style.display = 'none';
             document.getElementById('inputLine').style.display = 'flex';
-            document.getElementById('output').innerHTML = '';
+            
+            // Clear command area except for the input line
+            const commandArea = document.getElementById('commandArea');
+            const inputLine = document.getElementById('inputLine');
+            commandArea.innerHTML = '';
+            commandArea.appendChild(inputLine);
             
             // Clear the input field
             document.getElementById('input').value = '';
