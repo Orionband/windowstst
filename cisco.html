@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cisco IOS Terminal</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        div {
+            margin: 0;
+            padding: 0;
+        }
+        
+        .terminal {
+            height: 100vh;
+            background-color: #000;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.2;
+        }
+        
+        .version-info {
+            margin-bottom: 0;
+            padding: 0;
+            white-space: pre-wrap;
+            color: #fff;
+        }
+        
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+        
+        .prompt {
+            color: #fff;
+            margin-right: 0;
+        }
+        
+        .input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            outline: none;
+            flex: 1;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .command-area {
+            margin: 0;
+            padding: 0;
+        }
+        
+        .cursor {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .result-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .result-content {
+            background-color: #000;
+            border: 2px solid #fff;
+            padding: 40px;
+            text-align: center;
+            border-radius: 10px;
+            max-width: 400px;
+        }
+        
+        .result-content h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+        }
+        
+        .result-content.correct h2 {
+            color: #00ff00;
+        }
+        
+        .result-content.wrong h2 {
+            color: #ff0000;
+        }
+        
+        .result-content p {
+            margin: 0 0 30px 0;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        
+        .reset-btn {
+            background-color: #333;
+            color: #fff;
+            border: 2px solid #fff;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .reset-btn:hover {
+            background-color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal" id="terminal">
+        <div class="version-info" id="versionInfo"></div>
+        <div class="command-area" id="commandArea">
+            <div class="input-line" id="inputLine">
+                <span class="prompt" id="prompt">Router></span>
+                <input type="text" class="input" id="input" autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+    </div>
+
+    <div class="result-screen" id="resultScreen" style="display: none;">
+        <div class="result-content">
+            <h2 id="resultTitle"></h2>
+            <p id="resultMessage"></p>
+            <button class="reset-btn" onclick="resetQuiz()">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        class CiscoIOSSimulator {
+            constructor() {
+                this.hostname = "Router";
+                this.mode = "user"; // user, privileged, global-config
+                this.version = "Cisco IOS Software, C2900 Software (C2900-UNIVERSALK9-M), Version 15.1(4)M4, RELEASE SOFTWARE (fc1)\nTechnical Support: http://www.cisco.com/techsupport\nCopyright (c) 1986-2012 by Cisco Systems, Inc.\nCompiled Wed 24-Oct-12 04:09 by prod_rel_team\n";
+                // Get an array of accepted answers from the URL
+                this.acceptedAnswers = this.getAcceptedAnswers();
+                this.quizCompleted = false;
+                this.enteredCommands = [];
+                this.currentSequence = [];
+                
+                this.terminal = document.getElementById('terminal');
+                this.commandArea = document.getElementById('commandArea');
+                this.input = document.getElementById('input');
+                this.prompt = document.getElementById('prompt');
+                this.inputLine = document.getElementById('inputLine');
+                this.versionInfo = document.getElementById('versionInfo');
+                this.resultScreen = document.getElementById('resultScreen');
+                this.resultTitle = document.getElementById('resultTitle');
+                this.resultMessage = document.getElementById('resultMessage');
+                
+                this.init();
+            }
+            
+            // Parses the 'q' parameter for multiple, comma-separated answers.
+            // Now also handles multi-line sequences indicated by colons
+            getAcceptedAnswers() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const qParam = urlParams.get('q');
+
+                // If q parameter is not present, no answer is correct.
+                if (qParam === null) {
+                    return [];
+                }
+
+                // Split by commas to get individual answer options
+                const answerOptions = qParam.split(',').map(answer => answer.trim());
+                
+                // Process each answer option
+                return answerOptions.map(answer => {
+                    // Check if this answer contains colons (multi-line sequence)
+                    if (answer.includes(':')) {
+                        // Split by colon and convert each line to lowercase
+                        return answer.split(':').map(line => line.trim().toLowerCase());
+                    } else {
+                        // Single line answer
+                        return answer.toLowerCase();
+                    }
+                });
+            }
+            
+            init() {
+                this.versionInfo.textContent = this.version;
+                this.input.focus();
+                
+                this.input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !this.quizCompleted) {
+                        this.processCommand();
+                    }
+                });
+                
+                // Keep input focused
+                document.addEventListener('click', () => {
+                    if (!this.quizCompleted) {
+                        this.input.focus();
+                    }
+                });
+            }
+            
+            addCommandToHistory(command) {
+                // Convert current input line to history
+                const historyLine = document.createElement('div');
+                historyLine.className = 'input-line';
+                historyLine.innerHTML = `<span class="prompt">${this.prompt.textContent}</span>${command}`;
+                
+                // Insert before the current input line
+                this.commandArea.insertBefore(historyLine, this.inputLine);
+                
+                this.scrollToBottom();
+            }
+            
+            printOutput(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                div.style.margin = '0';
+                div.style.padding = '0';
+                div.style.lineHeight = '1.2';
+                this.output.appendChild(div);
+                this.scrollToBottom();
+            }
+            
+            scrollToBottom() {
+                this.terminal.scrollTop = this.terminal.scrollHeight;
+            }
+            
+            updatePrompt() {
+                let promptText = "";
+                switch(this.mode) {
+                    case "user":
+                        promptText = this.hostname + ">";
+                        break;
+                    case "privileged":
+                        promptText = this.hostname + "#";
+                        break;
+                    case "global-config":
+                        promptText = this.hostname + "(config)#";
+                        break;
+                    case "interface-config":
+                        promptText = this.hostname + "(config-if)#";
+                        break;
+                    case "line-config":
+                        promptText = this.hostname + "(config-line)#";
+                        break;
+                    default:
+                        promptText = this.hostname + ">";
+                }
+                this.prompt.textContent = promptText;
+            }
+            
+            // Checks if the user input matches any of the accepted answer patterns
+            processCommand() {
+                const userInput = this.input.value.trim();
+                
+                // Add the command to the display history
+                this.addCommandToHistory(userInput);
+                
+                // Add to our sequence tracking
+                this.currentSequence.push(userInput.toLowerCase());
+                
+                // Clear the input field for the next command
+                this.input.value = '';
+                
+                // Check if we have a match with any of the accepted answers
+                let isCorrect = false;
+                
+                for (let answer of this.acceptedAnswers) {
+                    if (Array.isArray(answer)) {
+                        // Multi-line answer - check if current sequence matches
+                        if (this.arraysEqual(this.currentSequence, answer)) {
+                            isCorrect = true;
+                            break;
+                        }
+                        // Check if we're still building towards this answer
+                        if (answer.length > this.currentSequence.length) {
+                            let stillMatching = true;
+                            for (let i = 0; i < this.currentSequence.length; i++) {
+                                if (this.currentSequence[i] !== answer[i]) {
+                                    stillMatching = false;
+                                    break;
+                                }
+                            }
+                            if (stillMatching) {
+                                // Still building the sequence, don't end quiz yet
+                                // Just clear the input and continue
+                                return;
+                            }
+                        }
+                    } else {
+                        // Single line answer
+                        if (this.currentSequence.length === 1 && this.currentSequence[0] === answer) {
+                            isCorrect = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Show result
+                this.showResult(isCorrect);
+                this.quizCompleted = true;
+            }
+            
+            // Helper function to compare arrays
+            arraysEqual(a, b) {
+                if (a.length !== b.length) return false;
+                for (let i = 0; i < a.length; i++) {
+                    if (a[i] !== b[i]) return false;
+                }
+                return true;
+            }
+            
+            showResult(isCorrect) {
+                const resultContent = this.resultScreen.querySelector('.result-content');
+    
+                if (isCorrect) {
+                    resultContent.className = 'result-content correct';
+                    this.resultTitle.textContent = 'Correct!';
+                    this.resultMessage.textContent = 'Great job! You entered the correct Cisco IOS command.';
+                } else {
+                    const messages = [
+                        "Remember, it's nats or your kneecaps!",
+                        "This is not skibidi sigma behavior.",
+                        "HAIYAAAA even my 5 year old cousin can do better la!",
+                        "You have brought dishonor to your ancestors.",
+                        "Lock in.",
+                        "Are we dead ahh right now?",
+                        "Don't worry. There's always McDonalds.",
+                        "Stop gooning and lock in.",
+                        "Cut the doom scrolling and actually do something useful.",
+                        "Skill issue. Do better.",
+                        "If you don't get this right, you're beyond cooked.",
+                        "Even a CCNA student could do better!",
+                        "Your routing table is corrupted.",
+                        "No IP route to success found.",
+                        "Access denied - insufficient privileges to succeed.",
+                        "Connection timeout - try learning the commands first."
+                    ];
+                    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+            
+                    resultContent.className = 'result-content wrong';
+                    this.resultTitle.textContent = 'Wrong!';
+                    this.resultMessage.textContent = randomMessage;
+                }
+    
+                this.resultScreen.style.display = 'flex';
+                this.inputLine.style.display = 'none';
+            }
+            
+            changeMode(command) {
+                const cmd = command.toLowerCase().trim();
+                
+                if (cmd === "enable" && this.mode === "user") {
+                    this.mode = "privileged";
+                } else if (cmd === "disable" && this.mode === "privileged") {
+                    this.mode = "user";
+                } else if (cmd === "configure terminal" && this.mode === "privileged") {
+                    this.mode = "global-config";
+                } else if (cmd.startsWith("interface ") && this.mode === "global-config") {
+                    this.mode = "interface-config";
+                } else if (cmd.startsWith("line ") && this.mode === "global-config") {
+                    this.mode = "line-config";
+                } else if (cmd === "exit") {
+                    if (this.mode === "interface-config" || this.mode === "line-config") {
+                        this.mode = "global-config";
+                    } else if (this.mode === "global-config") {
+                        this.mode = "privileged";
+                    } else if (this.mode === "privileged") {
+                        this.mode = "user";
+                    }
+                }
+                
+                this.updatePrompt();
+            }
+        }
+        
+        // Reset function
+        function resetQuiz() {
+            document.getElementById('resultScreen').style.display = 'none';
+            document.getElementById('inputLine').style.display = 'flex';
+            
+            // Clear command area except for the input line
+            const commandArea = document.getElementById('commandArea');
+            const inputLine = document.getElementById('inputLine');
+            commandArea.innerHTML = '';
+            commandArea.appendChild(inputLine);
+            
+            // Clear the input field
+            document.getElementById('input').value = '';
+            
+            // Reinitialize the simulator
+            window.ciscoSim = new CiscoIOSSimulator();
+        }
+        
+        // Initialize the simulator when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.ciscoSim = new CiscoIOSSimulator();
+        });
+    </script>
+</body>
+</html>
