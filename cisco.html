@@ -283,6 +283,9 @@
                 // Add the command to the display history
                 this.addCommandToHistory(userInput);
                 
+                // Process mode changes based on the command
+                this.changeMode(userInput);
+                
                 // Add to our sequence tracking
                 this.currentSequence.push(userInput.toLowerCase());
                 
@@ -356,12 +359,7 @@
                         "Stop gooning and lock in.",
                         "Cut the doom scrolling and actually do something useful.",
                         "Skill issue. Do better.",
-                        "If you don't get this right, you're beyond cooked.",
-                        "Even a CCNA student could do better!",
-                        "Your routing table is corrupted.",
-                        "No IP route to success found.",
-                        "Access denied - insufficient privileges to succeed.",
-                        "Connection timeout - try learning the commands first."
+                        "If you don't get this right, you're beyond cooked."
                     ];
                     const randomMessage = messages[Math.floor(Math.random() * messages.length)];
             
@@ -414,6 +412,9 @@
             
             // Clear the input field
             document.getElementById('input').value = '';
+            
+            // Reset the prompt back to initial state
+            document.getElementById('prompt').textContent = 'Router>';
             
             // Reinitialize the simulator
             window.ciscoSim = new CiscoIOSSimulator();
