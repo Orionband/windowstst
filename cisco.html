@@ -169,7 +169,7 @@
         class CiscoIOSSimulator {
             constructor() {
                 this.hostname = "Router";
-                this.mode = "user"; // user, privileged, global-config
+                this.mode = this.getInitialMode(); // Changed: now gets mode from URL parameter
                 // Get an array of accepted answers from the URL
                 this.acceptedAnswers = this.getAcceptedAnswers();
                 this.quizCompleted = false;
@@ -186,6 +186,32 @@
                 this.resultMessage = document.getElementById('resultMessage');
                 
                 this.init();
+            }
+            
+            // NEW METHOD: Gets initial mode from URL parameter
+            getInitialMode() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const iParam = urlParams.get('i');
+                
+                if (iParam === null) {
+                    return "user"; // Default to user mode
+                }
+                
+                const mode = iParam.toLowerCase();
+                switch(mode) {
+                    case "usr":
+                    case "user":
+                        return "user";
+                    case "priv":
+                    case "privileged":
+                        return "privileged";
+                    case "global":
+                    case "config":
+                    case "global-config":
+                        return "global-config";
+                    default:
+                        return "user"; // Default fallback
+                }
             }
             
             // Parses the 'q' parameter for multiple, comma-separated answers.
@@ -216,6 +242,7 @@
             }
             
             init() {
+                this.updatePrompt(); // Added: Update prompt based on initial mode
                 this.input.focus();
                 
                 this.input.addEventListener('keydown', (e) => {
@@ -352,7 +379,7 @@
                 if (isCorrect) {
                     resultContent.className = 'result-content correct';
                     this.resultTitle.textContent = 'Correct!';
-                    this.resultMessage.textContent = 'Great job! You entered the correct Cisco IOS command(s).';
+                    this.resultMessage.textContent = 'Great job! You entered the correct Cisco IOS command.';
                 } else {
                     const messages = [
                         "Remember, it's nats or your kneecaps!",
