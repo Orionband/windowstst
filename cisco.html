@@ -418,6 +418,8 @@
                     this.mode = "interface-config";
                 } else if (cmd.startsWith("line ") && this.mode === "global-config") {
                     this.mode = "line-config";
+                } else if (cmd === "line console 0" && this.mode === "global-config") {
+                    this.mode = "line-config";
                 } else if (cmd === "exit") {
                     if (this.mode === "interface-config" || this.mode === "line-config") {
                         this.mode = "global-config";
